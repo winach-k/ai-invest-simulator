@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import json
 import os
-import numpy as np
 
 st.set_page_config(layout="wide")
 st.title("🦾 多股票永久AI投資 $10k")
@@ -23,7 +23,7 @@ if 'cash' not in st.session_state:
 col1, col2, col3 = st.columns(3)
 total_value = st.session_state.cash
 for symbol, shares in st.session_state.holdings.items():
-    price = 80 if symbol=='NEE' else 450 if symbol=='GEV' else 120
+    price = 80 if symbol == 'NEE' else 450 if symbol == 'GEV' else 120
     total_value += shares * price
 
 with col1:
@@ -33,10 +33,10 @@ with col2:
 with col3:
     st.metric("📊 總股數", sum(st.session_state.holdings.values()))
 
-# AI智能買入（隨機選3隻）
+# AI智能買入
 if st.button("🤖 AI智能買入", type="primary"):
     symbols = ['NEE', 'GEV', 'VST']
-    symbol = np.random.choice(symbols)  # AI隨機選股
+    symbol = np.random.choice(symbols)
     prices = {'NEE': 80, 'GEV': 450, 'VST': 120}
     price = prices[symbol]
     
@@ -48,31 +48,29 @@ if st.button("🤖 AI智能買入", type="primary"):
             "時間": str(pd.Timestamp.now()),
             "動作": f"AI買入{symbol}",
             "價格": f"${price}",
-            "現金": st.session_state.cash,
-            "持倉": st.session_state.holdings.copy()
+            "現金": st.session_state.cash
         })
         
-        # 永久保存
         with open(DATA_FILE, "w") as f:
             json.dump(trades, f)
         
-        st.success(f"✅ AI買入 {symbol} 1股 @ ${price}")
+        st.success(f"✅ AI買入 {symbol} 1股")
         st.rerun()
 
 # 永久歷史
 st.subheader("📈 永久交易歷史")
 if trades:
-    df = pd.DataFrame(trades[-20:])
-    st.dataframe(df[['時間', '動作', '價格', '現金']], use_container_width=True)
+    df = pd.DataFrame(trades[-10:])
+    st.dataframe(df, use_container_width=True)
 else:
-    st.info("按AI買入開始記錄歷史！")
+    st.info("按AI買入開始記錄！")
 
-# 持倉明細
-st.subheader("📊 持倉明細")
+# 持倉
+st.subheader("📊 持倉")
 holdings_data = []
 for symbol, shares in st.session_state.holdings.items():
     if shares > 0:
-        price = 80 if symbol=='NEE' else 450 if symbol=='GEV' else 120
+        price = 80 if symbol == 'NEE' else 450 if symbol == 'GEV' else 120
         value = shares * price
         holdings_data.append([symbol, shares, f"${price}", f"${value:.0f}"])
 if holdings_
