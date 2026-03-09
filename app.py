@@ -1,80 +1,106 @@
 import streamlit as st
-import requests
 import pandas as pd
+import numpy as np
+import time
 from datetime import datetime
 
-st.title("🤖 AI電力股（真實價）")
+st.set_page_config(page_title="電力股遊戲", layout="wide")
+st.title("⚡ 電力股交易大賽 ⚡")
 
-if 'cash' not in st.session_state:
+# 遊戲初始化
+if 'round' not in st.session_state:
+    st.session_state.round = 1
     st.session_state.cash = 10000
     st.session_state.holdings = {'NEE':0, 'GEV':0, 'VST':0}
+    st.session_state.ai_cash = 10000
+    st.session_state.ai_holdings = {'NEE':0, 'GEV':0, 'VST':0}
+    st.session_state.prices = {'NEE':91, 'GEV':785, 'VST':159}
     st.session_state.history = []
 
-stocks = {
-    'NEE': {'name':'NextEra Energy', 'price':91.0},  # 真實價 [web:436]
-    'GEV': {'name':'GE Vernova', 'price':786.0},     # 真實價 [web:437]
-    'VST': {'name':'Vistra', 'price':159.0}          # 真實價 [web:438]
-}
+stocks = ['NEE','GEV','VST']
+stock_names = {'NEE':'NextEra','GEV':'GE Vernova','VST':'Vistra'}
 
-# 手動刷新按鈕
-if st.button("🔄 刷新價格"):
-    st.cache_data.clear()
-    st.rerun()
-
-# 顯示價格（預設真實+備用API）
-st.subheader("💹 股票價格")
-cols = st.columns(3)
-for i, (s, info) in enumerate(stocks.items()):
-    with cols[i]:
-        st.metric(info['name'], f"${info['price']}", delta=1.2)
-
-# AI決策（基於固定PE）
-st.subheader("🤖 AI建議")
-signals = {}
-pe_cols = st.columns(3)
-pes = {'NEE':27.6, 'GEV':44.6, 'VST':18.4}  # 真實PE
-for i, s in enumerate(stocks):
-    pe = pes[s]
-    signal = "🟢買入" if pe < 22 else "🔴賣出" if pe > 35 else "⚪持有"
-    signals[s] = signal
-    pe_cols[i].write(f"**{s}: {signal}**  PE={pe}")
-
-# 總資產
-total = st.session_state.cash
-for s in stocks:
-    total += st.session_state.holdings[s] * stocks[s]['price']
-st.metric("💰 總資產", f"${total:,.0f}")
-
-# 持倉表
-hold_data = []
-for s, info in stocks.items():
-    value = st.session_state.holdings[s] * info['price']
-    hold_data.append({'股票':s, '股數':st.session_state.holdings[s], 
-                     '現價':f"${info['price']}", '市值':f"${value:,.0f}"})
-st.dataframe(pd.DataFrame(hold_data))
-
-# AI交易
-col1, col2 = st.columns(2)
-if col1.button("🚀 AI全自動", type="primary"):
+# 每輪隨機波動
+def update_prices():
     for s in stocks:
-        p = stocks[s]['price']
-        if signals[s] == "🟢買入" and st.session_state.cash >= p:
-            st.session_state.holdings[s] += 1
-            st.session_state.cash -= p
-            st.session_state.history.append(f"買{s} ${p}")
-        elif signals[s] == "🔴賣出" and st.session_state.holdings[s] > 0:
-            st.session_state.holdings[s] -= 1
-            st.session_state.cash += p
-            st.session_state.history.append(f"賣{s} ${p}")
+        change = np.random.uniform(-5, +8) / 100
+        st.session_state.prices[s] = round(st.session_state.prices[s] * (1 + change), 1)
+
+# AI對手（簡單策略）
+def ai_trade():
+    for s in stocks:
+        p = st.session_state.prices[s]
+        # AI隨機買低賣高
+        if np.random.random() > 0.7 and st.session_state.ai_cash >= p:
+            st.session_state.ai_holdings[s] += 1
+            st.session_state.ai_cash -= p
+        elif st.session_state.ai_holdings[s] > 0 and np.random.random() > 0.8:
+            st.session_state.ai_holdings[s] -= 1
+            st.session_state.ai_cash += p
+
+# 遊戲主畫面
+col_round, col_time = st.columns(2)
+col_round.metric("🏆 當前輪數", st.session_state.round)
+col_time.metric("⏰ 遊戲時間", f"{datetime.now().strftime('%H:%M:%S')}")
+
+# 價格表
+st.subheader("📈 實時股價")
+price_df = pd.DataFrame([
+    {'股票':s, '價格':f"${st.session_state.prices[s]}", 
+     '漲跌':f"{np.random.uniform(-5,5):+.1f}%"}
+    for s in stocks
+])
+st.dataframe(price_df.style.highlight_max(axis=0), use_container_width=True)
+
+# 玩家vs AI對戰
+st.subheader("⚔️ 你 vs AI對手")
+col_player, col_ai = st.columns(2)
+
+with col_player:
+    st.markdown("### 🟢 你")
+    player_total = st.session_state.cash
+    for s in stocks:
+        player_total += st.session_state.holdings[s] * st.session_state.prices[s]
+    st.metric("總資產", f"${player_total:,.0f}")
+    st.write("持倉:", {k:v for k,v in st.session_state.holdings.items() if v>0})
+
+with col_ai:
+    st.markdown("### 🔴 AI對手")
+    ai_total = st.session_state.ai_cash
+    for s in stocks:
+        ai_total += st.session_state.ai_holdings[s] * st.session_state.prices[s]
+    st.metric("總資產", f"${ai_total:,.0f}")
+    st.write("持倉:", {k:v for k,v in st.session_state.ai_holdings.items() if v>0})
+
+# 交易區
+st.subheader("💼 你的操作")
+col1, col2, col3, col4 = st.columns(4)
+if col1.button("➕ 買NEE", type="secondary"):
+    if st.session_state.cash >= st.session_state.prices['NEE']:
+        st.session_state.holdings['NEE'] += 1
+        st.session_state.cash -= st.session_state.prices['NEE']
+        st.session_state.history.append(f"買NEE ${st.session_state.prices['NEE']}")
+        st.rerun()
+
+if col2.button("➕ 買GEV", type="secondary"):
+    if st.session_state.cash >= st.session_state.prices['GEV']:
+        st.session_state.holdings['GEV'] += 1
+        st.session_state.cash -= st.session_state.prices['GEV']
+        st.session_state.history.append(f"買GEV ${st.session_state.prices['GEV']}")
+        st.rerun()
+
+if col3.button("➕ 買VST", type="secondary"):
+    if st.session_state.cash >= st.session_state.prices['VST']:
+        st.session_state.holdings['VST'] += 1
+        st.session_state.cash -= st.session_state.prices['VST']
+        st.session_state.history.append(f"買VST ${st.session_state.prices['VST']}")
+        st.rerun()
+
+if col4.button("💰 全賣", type="primary"):
+    for s in stocks:
+        st.session_state.cash += st.session_state.holdings[s] * st.session_state.prices[s]
+        st.session_state.holdings[s] = 0
+    st.session_state.history.append("全賣清倉")
     st.rerun()
 
-if col2.button("💾 重置"):
-    st.session_state.cash = 10000
-    st.session_state.holdings = {'NEE':0, 'GEV':0, 'VST':0}
-    st.session_state.history = []
-    st.rerun()
 
-st.subheader("📜 交易記錄")
-st.write(st.session_state.history[-8:])
-
-st.caption("✅ **真實價** NEE$91/GEV$786/VST$159 | AI基於PE | 按🚀自動交易")
