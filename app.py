@@ -73,7 +73,7 @@ for symbol, shares in st.session_state.holdings.items():
         price = 80 if symbol == 'NEE' else 450 if symbol == 'GEV' else 120
         value = shares * price
         holdings_data.append([symbol, shares, f"${price}", f"${value:.0f}"])
-if holdings_
+if holdings:
     st.dataframe(pd.DataFrame(holdings_data, columns=['股票','股數','現價','市值']))
 else:
     st.info("暫無持倉")
