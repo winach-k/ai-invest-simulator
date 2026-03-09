@@ -1,54 +1,60 @@
 import streamlit as st
+import yfinance as yf
 import pandas as pd
 import plotly.express as px
+from io import BytesIO
 
 st.set_page_config(layout="wide")
-st.title("☀️ 華潤新能源 IPO財務分析")
+st.title("🏢 動態上市公司分析")
 
-st.markdown("""
-**華潤新能源** 2025主板IPO，募資245億！
-風電+光伏，準上市龍頭 [web:488]
-""")
+# 多模式輸入
+tab1, tab2, tab3 = st.tabs(["股票代碼", "上傳Excel", "華潤新能源"])
 
-# 財務數據表
-st.subheader("📊 業績增長")
-data = {
-    '年份': ['2022', '2023', '2024', '2025H1'],
-    '收入(億)': [181.98, 205.12, 228.74, 130.14],
-    '淨利(億)': [62.96, 82.80, 79.53, 47.02],
-    '淨利率%': [34.6, 40.4, 34.8, 36.1]
-}
-df = pd.DataFrame(data)
-st.dataframe(df)
+with tab1:
+    ticker = st.text_input("股票代碼", "0700.HK")
+    if st.button("🚀 即時分析"):
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("市值", f"${info.get('marketCap','N/A')/1e9:.1f}B")
+        col2.metric("PE", info.get('forwardPE','N/A'))
+        col3.metric("股價", f"${stock.history(period='1d')['Close'][-1]:.1f}")
+        
+        hist = stock.history(period="2y")
+        fig = px.line(hist, y='Close', title=f"{ticker} 股價趨勢")
+        st.plotly_chart(fig)
 
-# 趨勢圖
-fig = px.line(df, x='年份', y=['收入(億)','淨利(億)'], 
-              markers=True, title="收入淨利穩增")
-st.plotly_chart(fig, use_container_width=True)
+with tab2:
+    uploaded = st.file_uploader("📁 上傳財報Excel")
+    if uploaded:
+        df = pd.read_excel(uploaded)
+        st.dataframe(df)
+        # 自動計算比率
+        if '收入' in df.columns and '淨利' in df.columns:
+            df['淨利率'] = df['淨利']/df['收入']
+            fig = px.bar(df, x=df.columns[0], y='淨利率', title="淨利率分析")
+            st.plotly_chart(fig)
 
-# 關鍵指標
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("收入CAGR", "11.8%")
-col2.metric("淨利CAGR", "10.2%")
-col3.metric("平均淨利率", "36.5%")
-col4.metric("募資規模", "245億")
+with tab3:
+    # 華潤新能源專區
+    st.subheader("☀️ 華潤新能源動態")
+    cr_data = {
+        '期間': ['2022','2023','2024','2025H1'],
+        '收入億': [181.98,205.12,228.74,130.14],
+        '淨利億': [62.96,82.80,79.53,47.02]
+    }
+    df_cr = pd.DataFrame(cr_data)
+    fig_cr = px.line(df_cr, x='期間', y=['收入億','淨利億'])
+    st.plotly_chart(fig_cr)
+    
+    # 即時新聞（模擬）
+    st.info("最新：IPO進展順利，募資245億擴風光")
 
-st.subheader("💰 估值分析")
-st.info("""
-✅ **強勢**：淨利率36%（行業龍頭）
-✅ **穩健**：收入年增10%+
-✅ **風險**：2024淨利微降（電價？）
-✅ **IPO**：募資擴風光項目
-""")
+# 通用分析工具
+st.sidebar.header("🔧 分析工具")
+if st.sidebar.button("計算ROE"):
+    roe = st.sidebar.number_input("淨利/億") / st.sidebar.number_input("權益/億")
+    st.sidebar.metric("ROE", f"{roe:.1%}")
 
-# 風險雷達圖
-fig_radar = px.line_polar(pd.DataFrame({
-    '指標': ['增長', '盈利', '現金流', '負債', '政策'],
-    '分數': [8, 9, 7, 6, 9]
-}), r='分數', theta='指標')
-st.plotly_chart(fig_radar)
-
-st.subheader("📈 投資評級")
-st.success("**買入** - 準上市新能源優質標的")
-
-st.caption("數據來源：[web:488][web:489] | 2026/3分析")
+st.success("✅ **動態分析就緒**！輸入代碼/文件即分析")
