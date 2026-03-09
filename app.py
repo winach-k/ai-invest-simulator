@@ -88,7 +88,7 @@ for symbol, shares in st.session_state.holdings.items():
         price = ai_price(symbol)
         value = shares * price
         holdings_data.append([symbol, shares, f"${price:.1f}", f"${value:.0f}"])
-if holdings_
+if holdings_data:
     st.dataframe(pd.DataFrame(holdings_data, columns=['股票','股數','現價','市值']))
 else:
     st.info("🤖 AI暫未建倉")
